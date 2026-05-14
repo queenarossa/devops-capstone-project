@@ -122,5 +122,73 @@ class TestAccountService(TestCase):
             content_type="test/html"
         )
         self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
+    
+    def test_update_account(self):
+        """It should Update an existing Account"""
+        # Buat akun baru terlebih dahulu untuk memperbarui data
+        account = self._create_accounts(1)[0]
+        resp = self.client.get(f"{BASE_URL}/{account.id}")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        # Ubah data nama akun tersebut
+        new_account = resp.get_json()
+        new_account["name"] = "Nama Baru Yang Diubah"
+        
+        # Kirim permintaan PUT untuk memperbarui data di database
+        resp = self.client.put(f"{BASE_URL}/{account.id}", json=new_account)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        # Pastikan data namanya benar-benar berubah
+        updated_account = resp.get_json()
+        self.assertEqual(updated_account["name"], "Nama Baru Yang Diubah")
 
-    # ADD YOUR TEST CASES HERE ...
+    def test_update_account_not_found(self):
+        """It should not Update an Account that is not found"""
+        resp = self.client.put(f"{BASE_URL}/0", json={})
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+    
+    def test_delete_account(self):
+        """It should Delete an Account"""
+        account = self._create_accounts(1)[0]
+        # Kirim permintaan DELETE
+        resp = self.client.delete(f"{BASE_URL}/{account.id}")
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+        
+        # Pastikan akun sudah tidak bisa ditemukan lagi (404) setelah dihapus
+        resp = self.client.get(f"{BASE_URL}/{account.id}")
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_get_account_list(self):
+        """It should Get a list of Accounts"""
+        self._create_accounts(5)  # Membuat 5 akun tiruan untuk tes
+        resp = self.client.get(BASE_URL)
+        
+        # Pastikan status code-nya 200 OK
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        
+        # Ambil datanya dan pastikan jumlahnya ada 5
+        data = resp.get_json()
+        self.assertEqual(len(data), 5)
+    
+    def test_get_account(self):
+        """It should Read a single Account"""
+        # Buat satu akun tiruan
+        account = self._create_accounts(1)[0]
+        
+        # Panggil endpoint GET /accounts/id_akun
+        resp = self.client.get(
+            f"{BASE_URL}/{account.id}", content_type="application/json"
+        )
+        
+        # Pastikan berhasil (200 OK) dan namanya cocok
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.get_json()
+        self.assertEqual(data["name"], account.name)
+
+    def test_get_account_not_found(self):
+        """It should not Read an Account that is not found"""
+        # Coba panggil ID yang tidak mungkin ada (misal: 0)
+        resp = self.client.get(f"{BASE_URL}/0")
+        
+        # Pastikan status code-nya 404 NOT FOUND
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
