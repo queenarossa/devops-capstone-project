@@ -19,6 +19,29 @@ DATABASE_URI = os.getenv(
 
 BASE_URL = "/accounts"
 
+# Tambahkan ini di bagian atas setelah BASE_URL
+HTTPS_ENVIRON = {'wsgi.url_scheme': 'https'}
+
+# Di dalam class TestAccountRoutes(TestCase):
+def test_security_headers(self):
+    """It should return security headers"""
+    response = self.client.get('/', environ_overrides=HTTPS_ENVIRON)
+    self.assertEqual(response.status_code, 200)
+    headers = {
+        'X-Frame-Options': 'SAMEORIGIN',
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'self'; object-src 'none'",
+        'Referrer-Policy': 'strict-origin-when-cross-origin'
+    }
+    for key, value in headers.items():
+        self.assertEqual(response.headers.get(key), value)
+
+def test_cors_security(self):
+    """It should return a CORS header"""
+    response = self.client.get('/', environ_overrides=HTTPS_ENVIRON)
+    self.assertEqual(response.status_code, 200)
+    # Cek header Access-Control-Allow-Origin
+    self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), '*')
 
 ######################################################################
 #  T E S T   C A S E S
@@ -33,6 +56,7 @@ class TestAccountService(TestCase):
         app.config["DEBUG"] = False
         app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
         app.logger.setLevel(logging.CRITICAL)
+        talisman.force_https = False # Tambahkan ini agar tes tidak error
         init_db(app)
 
     @classmethod
