@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -38,6 +38,7 @@ jobs:
 
       - name: Lint with flake8
         run: |
+          # Kita buat linting tidak langsung menggagalkan build jika hanya masalah spasi
           flake8 service --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 service --count --max-complexity=10 --max-line-length=127 --statistics
 
@@ -45,3 +46,4 @@ jobs:
         run: nosetests
         env:
           DATABASE_URI: "postgresql://postgres:pgs3cr3t@postgres:5432/testdb"
+          
