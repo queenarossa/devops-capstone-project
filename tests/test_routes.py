@@ -12,6 +12,8 @@ from tests.factories import AccountFactory
 from service.common import status  # HTTP Status Codes
 from service.models import db, Account, init_db
 from service.routes import app
+# IMPOR talisman DARI service AGAR BISA DIMATIKAN FORCE HTTPS-NYA
+from service import talisman 
 
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "postgresql://postgres:postgres@localhost:5432/postgres"
@@ -19,29 +21,9 @@ DATABASE_URI = os.getenv(
 
 BASE_URL = "/accounts"
 
-# Tambahkan ini di bagian atas setelah BASE_URL
+# Pemicu skema URL agar testing menganggap ini koneksi HTTPS aman
 HTTPS_ENVIRON = {'wsgi.url_scheme': 'https'}
 
-# Di dalam class TestAccountRoutes(TestCase):
-def test_security_headers(self):
-    """It should return security headers"""
-    response = self.client.get('/', environ_overrides=HTTPS_ENVIRON)
-    self.assertEqual(response.status_code, 200)
-    headers = {
-        'X-Frame-Options': 'SAMEORIGIN',
-        'X-Content-Type-Options': 'nosniff',
-        'Content-Security-Policy': "default-src 'self'; object-src 'none'",
-        'Referrer-Policy': 'strict-origin-when-cross-origin'
-    }
-    for key, value in headers.items():
-        self.assertEqual(response.headers.get(key), value)
-
-def test_cors_security(self):
-    """It should return a CORS header"""
-    response = self.client.get('/', environ_overrides=HTTPS_ENVIRON)
-    self.assertEqual(response.status_code, 200)
-    # Cek header Access-Control-Allow-Origin
-    self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), '*')
 
 ######################################################################
 #  T E S T   C A S E S
@@ -56,18 +38,19 @@ class TestAccountService(TestCase):
         app.config["DEBUG"] = False
         app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
         app.logger.setLevel(logging.CRITICAL)
-        talisman.force_https = False # Tambahkan ini agar tes tidak error
+        # Sekarang baris ini aman karena talisman sudah di-import di atas
+        talisman.force_https = False 
         init_db(app)
 
     @classmethod
     def tearDownClass(cls):
         """Runs once before test suite"""
+        pass
 
     def setUp(self):
         """Runs before each test"""
         db.session.query(Account).delete()  # clean up the last tests
         db.session.commit()
-
         self.client = app.test_client()
 
     def tearDown(self):
@@ -98,6 +81,30 @@ class TestAccountService(TestCase):
     #  A C C O U N T   T E S T   C A S E S
     ######################################################################
 
+    # --- TEST CASES BARU UNTUK KEAMANAN (SUDAH DI MASUKKAN KE DALAM CLASS) ---
+    
+    def test_security_headers(self):
+        """It should return security headers"""
+        response = self.client.get('/', environ_overrides=HTTPS_ENVIRON)
+        self.assertEqual(response.status_code, 200)
+        headers = {
+            'X-Frame-Options': 'SAMEORIGIN',
+            'X-Content-Type-Options': 'nosniff',
+            'Content-Security-Policy': "default-src 'self'; object-src 'none'",
+            'Referrer-Policy': 'strict-origin-when-cross-origin'
+        }
+        for key, value in headers.items():
+            self.assertEqual(response.headers.get(key), value)
+
+    def test_cors_security(self):
+        """It should return a CORS header"""
+        response = self.client.get('/', environ_overrides=HTTPS_ENVIRON)
+        self.assertEqual(response.status_code, 200)
+        # Cek apakah header Access-Control-Allow-Origin sudah "*"
+        self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), '*')
+
+    # --- SISA TEST CASES SEBELUMNYA ---
+
     def test_index(self):
         """It should get 200_OK from the Home Page"""
         response = self.client.get("/")
@@ -120,11 +127,9 @@ class TestAccountService(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # Make sure location header is set
         location = response.headers.get("Location", None)
         self.assertIsNotNone(location)
 
-        # Check the data is correct
         new_account = response.get_json()
         self.assertEqual(new_account["name"], account.name)
         self.assertEqual(new_account["email"], account.email)
@@ -149,20 +154,16 @@ class TestAccountService(TestCase):
     
     def test_update_account(self):
         """It should Update an existing Account"""
-        # Buat akun baru terlebih dahulu untuk memperbarui data
         account = self._create_accounts(1)[0]
         resp = self.client.get(f"{BASE_URL}/{account.id}")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         
-        # Ubah data nama akun tersebut
         new_account = resp.get_json()
         new_account["name"] = "Nama Baru Yang Diubah"
         
-        # Kirim permintaan PUT untuk memperbarui data di database
         resp = self.client.put(f"{BASE_URL}/{account.id}", json=new_account)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         
-        # Pastikan data namanya benar-benar berubah
         updated_account = resp.get_json()
         self.assertEqual(updated_account["name"], "Nama Baru Yang Diubah")
 
@@ -174,45 +175,34 @@ class TestAccountService(TestCase):
     def test_delete_account(self):
         """It should Delete an Account"""
         account = self._create_accounts(1)[0]
-        # Kirim permintaan DELETE
         resp = self.client.delete(f"{BASE_URL}/{account.id}")
         self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
         
-        # Pastikan akun sudah tidak bisa ditemukan lagi (404) setelah dihapus
         resp = self.client.get(f"{BASE_URL}/{account.id}")
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_get_account_list(self):
         """It should Get a list of Accounts"""
-        self._create_accounts(5)  # Membuat 5 akun tiruan untuk tes
+        self._create_accounts(5)
         resp = self.client.get(BASE_URL)
         
-        # Pastikan status code-nya 200 OK
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        
-        # Ambil datanya dan pastikan jumlahnya ada 5
         data = resp.get_json()
         self.assertEqual(len(data), 5)
     
     def test_get_account(self):
         """It should Read a single Account"""
-        # Buat satu akun tiruan
         account = self._create_accounts(1)[0]
         
-        # Panggil endpoint GET /accounts/id_akun
         resp = self.client.get(
             f"{BASE_URL}/{account.id}", content_type="application/json"
         )
         
-        # Pastikan berhasil (200 OK) dan namanya cocok
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         data = resp.get_json()
         self.assertEqual(data["name"], account.name)
 
     def test_get_account_not_found(self):
         """It should not Read an Account that is not found"""
-        # Coba panggil ID yang tidak mungkin ada (misal: 0)
         resp = self.client.get(f"{BASE_URL}/0")
-        
-        # Pastikan status code-nya 404 NOT FOUND
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
