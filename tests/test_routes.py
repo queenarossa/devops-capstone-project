@@ -2,7 +2,7 @@
 Account API Service Test Suite
 
 Test cases can be run with the following:
-  nosetests -v --with-spec --spec-color
+  nosetests -v --with-src --spec-color
   coverage report -m
 """
 import os
@@ -13,7 +13,7 @@ from service.common import status  # HTTP Status Codes
 from service.models import db, Account, init_db
 from service import app, talisman
 
-# Menggunakan SQLite in-memory sebagai cadangan aman agar tidak connection refused
+# Fallback ke SQLite agar tidak terkendala PostgreSQL saat testing di CI/Lokal
 DATABASE_URI = os.getenv(
     "DATABASE_URI", "sqlite:///test.db"
 )
@@ -38,7 +38,7 @@ class TestAccountService(TestCase):
         app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URI
         app.logger.setLevel(logging.CRITICAL)
         
-        # Matikan force_https pada talisman agar pengujian lokal berjalan lancar
+        # Matikan force_https agar test client bisa membaca endpoint tanpa SSL asli
         talisman.force_https = False 
         init_db(app)
 
@@ -98,7 +98,6 @@ class TestAccountService(TestCase):
         """It should return a CORS header"""
         response = self.client.get('/', environ_overrides=HTTPS_ENVIRON)
         self.assertEqual(response.status_code, 200)
-        # Memastikan header CORS Access-Control-Allow-Origin keluar dengan tanda "*"
         self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), '*')
 
     def test_index(self):
