@@ -1,5 +1,6 @@
 # Pin Werkzeug because it keeps breaking Flask!
 Werkzeug==2.1.2
+SQLAlchemy==1.4.46
 
 # Runtime dependencies
 Flask==2.1.2
@@ -29,5 +30,5 @@ codecov==2.1.13
 httpie==3.2.1
 
 # Security
-Flask-Talisman
-Flask-Cors
+Flask-Talisman==1.1.0
+Flask-Cors==4.0.0
